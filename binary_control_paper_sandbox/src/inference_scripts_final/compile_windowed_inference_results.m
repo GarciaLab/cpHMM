@@ -24,14 +24,13 @@ id_string =  ['/w' num2str(w) '_t' num2str(Tres)...
     '_alpha' num2str(round(alpha*10)) '_f' num2str(fluo_field) '_cl' num2str(clipped_traces) ...
     '_no_ends' num2str(no_ends_flag) '_off' num2str(off_traces_flag) '/K' num2str(K) ...
     '_tw' num2str(t_window/60) d_type suffix '/']; 
+
 OutPath = ['../../dat/' project '/' id_string];
-FigPath = ['../../fig/experimental_system/' project '/' id_string];
 mkdir(OutPath)
-mkdir(FigPath)
-%%% path to raw data
-% DropboxFolder = 'D:\Data\Nick\LivemRNA\LivemRNAFISH\Dropbox (Garcia Lab)\hmmm_data\inference_out\';
-DropboxFolder = 'E:/Nick/Dropbox (Garcia Lab)/hmmm_data/inference_out/';
-folder_path =  [DropboxFolder '/' project '/' id_string];
+
+%%% path to inference results
+DataFolder = '../../out/';
+folder_path =  [DataFolder '/' project '/' id_string];
 
 %---------------------------------Read in Files---------------------------%
 files = dir(folder_path);
@@ -56,25 +55,17 @@ f_pass = 1;
 for f = 1:length(filenames)
     % load the eve validation results into a structure array 'output'    
     load([folder_path filenames{f}]);
-%     if output.skip_flag == 1
     if length(fieldnames(output)) < 2
         continue
     end
-%     for i = 1:length(filenames)
-%         if sum(ismember(output.particle_ids(1:20),p_mat(i,:)))==20
-%             dup_list = [dup_list f];
-%         end
-%     end
-%     p_mat(f,:) = output.particle_ids(1:20);
     for fn = fieldnames(output)'
         glb_all(f_pass).(fn{1}) = output.(fn{1});
     end
     glb_all(f_pass).source = filenames{f};        
     f_pass = f_pass + 1
 end
-% dup_list = unique(dup_list);
-% %%
-%%% ------------------------------Fig Calculations-------------------------%
+
+%%% -------------------Compile Inference Results-------------------------%%
 %Adjust rates as needed (address negative off-diagonal values)
 %Define convenience Arrays and vectors
 alpha = glb_all(1).alpha;
@@ -84,7 +75,6 @@ for i = 1:length(glb_all)
     bin_vec = [bin_vec mean(glb_all(i).APbin)];
     bin_cell = [bin_cell{:} {glb_all(i).APbin}];
 end
-% bin_vec = [glb_all.APbin];
 bin_range = unique(bin_vec);
 time_vec = [glb_all.t_inf];
 time_index = unique(time_vec);
