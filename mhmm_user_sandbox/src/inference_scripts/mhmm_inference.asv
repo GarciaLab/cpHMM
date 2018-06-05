@@ -38,13 +38,15 @@ min_dp_per_inf = 1250; % inference will be aborted if fewer present
 %-------------------Load Data and Set Write Paths-------------------------%
 datapath = ['../../dat/' project '/']; %Path to inference data
 dataname = ['inference_traces_' project '_dT' num2str(Tres) '.mat']; %name of inference set
+
 % Load data for inference into struct named: trace_struct_final
 load([datapath dataname]);
 alpha = trace_struct_final(1).alpha_frac*w; % Rise Time for MS2 Loops in time steps
 
 % Set write path (inference results are now written to external directory)
 out_dir =  ['../../out/' project '/w' num2str(w) '_t' num2str(Tres)...
-    '_alpha' num2str(round(alpha*10)) '/K' num2str(K) '_tw' num2str(t_window/60) '/']; 
+    '_alpha' num2str(round(alpha*10)) '/K' num2str(K) ...
+    '_tw' num2str(t_window/60) '/']; 
 mkdir(out_dir);
 
 % get trace start and end times for each trace
