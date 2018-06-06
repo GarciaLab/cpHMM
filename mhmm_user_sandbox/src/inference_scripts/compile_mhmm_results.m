@@ -3,34 +3,24 @@ addpath('../utilities/');
 close all
 clear 
 %------------------------------Set System Params--------------------------%
-w = 7; %memory assumed for inference
-K = 3; %states used for final inference
+w = 6; %memory assumed for inference
+K = 2; %states used for final inference
 Tres = 20; %Time Resolution
-alpha = 1.4; % MS2 rise time in time steps
-fluo_field = 1; % type of spot integration used
-clipped_traces = 1; % if 0, traces are taken to be full length of nc14
-t_window = 50*60;
-no_ends_flag = 1;
-off_traces_flag = 0;
+alpha = 1.5; % MS2 rise time in time steps
+t_window = 15*60;
 %-----------------------------ID Variables--------------------------------%
-% write_csv  = 1; % if 1 write to csv (only for ss)
 % id variables
-datatype = 'weka';
-d_type = '_dp';
-project = 'mHMMeve2_weka_inf_2018_05_07'; %project identifier
-suffix = '';
+project = 'example_trace_set'; %project identifier
 %Generate filenames and writepath
 id_string =  ['/w' num2str(w) '_t' num2str(Tres)...
-    '_alpha' num2str(round(alpha*10)) '_f' num2str(fluo_field) '_cl' num2str(clipped_traces) ...
-    '_no_ends' num2str(no_ends_flag) '_off' num2str(off_traces_flag) '/K' num2str(K) ...
-    '_tw' num2str(t_window/60) d_type suffix '/']; 
+    '_alpha' num2str(round(alpha*10)) '/K' num2str(K) '_tw' num2str(t_window/60) '/'];
 
 OutPath = ['../../dat/' project '/' id_string];
 mkdir(OutPath)
 
 %%% path to inference results
 DataFolder = '../../out/';
-folder_path =  [DataFolder '/' project '/' id_string];
+folder_path =  [DataFolder project id_string];
 
 %---------------------------------Read in Files---------------------------%
 files = dir(folder_path);
@@ -50,8 +40,6 @@ end
 %Iterate through result sets and concatenate into 1 combined struct
 glb_all = struct;
 f_pass = 1;
-% p_mat = NaN(length(filenames),20);
-% dup_list = [];
 for f = 1:length(filenames)
     % load the eve validation results into a structure array 'output'    
     load([folder_path filenames{f}]);
@@ -72,8 +60,8 @@ alpha = glb_all(1).alpha;
 bin_vec = [];
 bin_cell = {};
 for i = 1:length(glb_all)
-    bin_vec = [bin_vec mean(glb_all(i).APbin)];
-    bin_cell = [bin_cell{:} {glb_all(i).APbin}];
+    bin_vec = [bin_vec mean(glb_all(i).group_vec)];
+    bin_cell = [bin_cell{:} {glb_all(i).group_vec}];
 end
 bin_range = unique(bin_vec);
 time_vec = [glb_all.t_inf];
@@ -83,7 +71,6 @@ pi0_all = zeros(K,length(glb_all));
 noise_all = zeros(1,length(glb_all)); % sigma  
 n_dp_all = zeros(1,length(glb_all));
 n_traces_all = zeros(1,length(glb_all));
-effective_times_all = zeros(1,length(glb_all));
 dwell_all = NaN(K,length(glb_all));
 % Extract variables and perform rate fitting as needed
 for i = 1:length(glb_all)    
@@ -91,8 +78,7 @@ for i = 1:length(glb_all)
     pi0 = glb_all(i).pi0(ranked_r);    
     noise_all(i) = sqrt(glb_all(i).noise); 
     n_dp_all(i) = glb_all(i).N;
-    n_traces_all(i) = length(glb_all(i).particle_ids);
-    effective_times_all(i) = nanmean([glb_all(i).time_data{:}]);
+    n_traces_all(i) = length(glb_all(i).particle_ids);    
     A = reshape(glb_all(i).A,K,K);
     A = A(ranked_r, ranked_r);
     %Obtain raw R matrix
@@ -233,8 +219,7 @@ for i = 1:length(bin_range)
         std_noise(i,t) = .5*(quantile(noise_all(bin_vec==bin&time_vec==time),.75)-...
                     quantile(noise_all(bin_vec==bin&time_vec==time),.25));
         med_n_dp(i,t) = median(n_dp_all(bin_vec==bin&time_vec==time));
-        med_n_tr(i,t) = median(n_traces_all(bin_vec==bin&time_vec==time));
-        med_eff_time(i,t) = median(effective_times_all(bin_vec==bin&time_vec==time));
+        med_n_tr(i,t) = median(n_traces_all(bin_vec==bin&time_vec==time));        
     end
 end
 % off rate, on rate and emission rates 
@@ -276,7 +261,6 @@ hmm_results = struct;
 for i = 1:length(bin_range)
     for t = 1:length(time_index)
         ind = (i-1)*length(time_index) + t;
-%         hmm_results(ind).N = bin_counts(i);
         hmm_results(ind).initiation_mean = med_initiation(:,i,t);
         hmm_results(ind).initiation_std = std_initiation(:,i,t);    
         hmm_results(ind).occupancy_mean = med_occupancy(:,i,t);
@@ -313,28 +297,7 @@ for i = 1:length(bin_range)
         hmm_results(ind).binID = bin_range(i);
         hmm_results(ind).t_inf = time_index(t);
         hmm_results(ind).alpha = alpha;
-        hmm_results(ind).dT = Tres;
-        hmm_results(ind).fluo_type = fluo_field; 
-        hmm_results(ind).clipped = clipped_traces; 
-        hmm_results(ind).clipped = no_ends_flag; 
+        hmm_results(ind).dT = Tres;        
     end
 end
 save([OutPath '/hmm_results_tw' num2str(round(t_window/60)) '_K' num2str(K) '.mat'],'hmm_results')
-
-
-% if write_csv 
-%     R_mean = reshape(med_R_fit,[],K^2)';
-%     R_ste = reshape(std_R_fit,[],K^2)';
-%     init_mean = med_initiation';
-%     init_ste = std_initiation';
-%     noise_mean = med_noise(:,1);
-%     noise_ste = std_noise(:,1);
-%     csv_data = [R_mean(:,[2:4 6:8]) R_ste(:,[2:4 6:8]) init_mean init_ste noise_mean noise_ste];
-%     header = {'0_to_1_mean', '0_to_2_mean', '1_to_0_mean', '1_to_2_mean', '2_to_0_mean', '2_to_1_mean',...
-%             '0_to_1_error', '0_to_2_error', '1_to_0_error', '1_to_2_error', '2_to_0_error', '2_to_1_error',...
-%             'r_0_mean', 'r_1_mean', 'r_2_mean', 'r_0_error', 'r_1_error', 'r_2_error', 'noise_mean', 'noise_error'};
-%     
-%     csvwrite_with_headers([OutPath '\eve_data_longform_w_nuclei.csv'], ...
-%                        csv_data, header,9); 
-% end                   
-%                  

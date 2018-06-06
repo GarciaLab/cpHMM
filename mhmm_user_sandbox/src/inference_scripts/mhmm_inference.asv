@@ -13,7 +13,6 @@
     % 4) alpha_frac: fractional length of MS2 loops relative to full
     %    transcript. For instance, if MS2 length is 1302 and transcript
     %    length is 6444, alpha_frac = 1302/6444
-    % 5) ParticleID: unique trace (particle) identifier
     
 %%%---------------------------------------------------------------------%%%
 close all
@@ -104,12 +103,10 @@ for g = 1:length(bin_groups) % loop through different AP groups
                     inference_set = [inference_set temp];
                 end
             end
-            skip_flag = 0;
-            if ~isempty(inference_set)
-                set_size = length([inference_set.fluo_interp]);                 
-            end
+            skip_flag = 0;            
             if isempty(inference_set)
                 skip_flag = 1;
+                set_size = length([inference_set.fluo_interp]);                 
             elseif set_size < min_dp_per_inf                    
                 skip_flag = 1;                    
             end
@@ -176,12 +173,12 @@ for g = 1:length(bin_groups) % loop through different AP groups
                     local_struct(i_local).pi0 = exp(local_out.pi0_log);
                     local_struct(i_local).total_steps = local_out.n_iter;               
                     local_struct(i_local).soft_struct = local_out.soft_struct;               
-                end 
-                
+                end                                
                 [logL, max_index] = max([local_struct.logL]); % Get index of best result                    
                 % Save parameters from most likely local run
                 output.pi0 =local_struct(max_index).pi0;                        
-                output.r = local_struct(max_index).r(:);                
+                output.r = local_struct(max_index).r(:);
+                output.off_traces = off_traces_flag;
                 output.noise = local_struct(max_index).noise;
                 output.A = local_struct(max_index).A(:);
                 output.A_mat = local_struct(max_index).A;                            
@@ -191,13 +188,16 @@ for g = 1:length(bin_groups) % loop through different AP groups
                 % other inference characteristics
                 output.group_vec = min(bin_list):max(bin_list); % inf group info
                 output.t_window = t_window;
-                output.t_inf = t_inf;                                                
+                output.t_inf = t_inf;
+                output.fluo_interp_type = fluo_field;
+                output.dp_bootstrap_flag = dp_bootstrap;
+                output.set_bootstrap_flag = set_bootstrap;
                 output.iter_id = b;                                                 
                 output.particle_ids = sample_particles;
                 output.N = ndp;                
                 output.w = w;
                 output.alpha = alpha;
-                output.Tres = Tres;                 
+                output.deltaT = Tres;                 
             end
             output.skip_flag = skip_flag;
             save([out_file '.mat'], 'output');           
