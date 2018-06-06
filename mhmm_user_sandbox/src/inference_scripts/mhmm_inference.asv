@@ -19,13 +19,13 @@ close all
 clear 
 addpath('../utilities'); % Route to utilities folder
 %-------------------------------System Vars-------------------------------%
-bin_groups = {-7:-4,-3:-2,-1:1,2:3,4:7}; % cell array containing region grouping for inference
-w = 7; % Memory
+bin_groups = {-1,1}; % cell array containing region grouping for inference
+w = 6; % Memory
 Tres = 20; % Time Resolution
-K = 3; % State to use for inference
+K = 2; % State to use for inference
 inference_times = (7.5:2.5:40)*60;%
 t_window = 15*60; % determines width of sliding window
-project = 'mHMMeve2_weka_inf_2018_05_07';  %identifier pointing to desired data set
+project = 'example_trace_set';  %identifier pointing to desired data set
 %------------------Define Inference Variables------------------------------%
 n_localEM = 25; % set num local runs (default=25)
 n_steps_max = 500; % set max steps per inference (default=500)
@@ -37,16 +37,14 @@ sample_size = 8000; % N data points to use
 min_dp_per_inf = 1250; % inference will be aborted if fewer present                                         
 %-------------------Load Data and Set Write Paths-------------------------%
 datapath = ['../../dat/' project '/']; %Path to inference data
-dataname = ['inference_traces_' project '_dT' num2str(Tres) '.mat']; %name of inference set
-
+dataname = 'trace_struct_final.mat'; %name of inference set
 % Load data for inference into struct named: trace_struct_final
 load([datapath dataname]);
 alpha = trace_struct_final(1).alpha_frac*w; % Rise Time for MS2 Loops in time steps
 
 % Set write path (inference results are now written to external directory)
 out_dir =  ['../../out/' project '/w' num2str(w) '_t' num2str(Tres)...
-    '_alpha' num2str(round(alpha*10)) '/K' num2str(K) ...
-    '_tw' num2str(t_window/60) '/']; 
+    '_alpha' num2str(round(alpha*10)) '/K' num2str(K) '_tw' num2str(t_window/60) '/']; 
 mkdir(out_dir);
 
 % get trace start and end times for each trace
@@ -77,8 +75,7 @@ for g = 1:length(bin_groups) % loop through different AP groups
         for b = 1:n_bootstrap % iterate through bootstrap replicates
             iter_start = now;
             % structures of store inference info
-            local_struct = struct; % track results of each local run
-            init_struct = struct; % track param initiation values used
+            local_struct = struct; % track results of each local run            
             output = struct; % final output structure saved to file
             
             % Use current time as unique inference identifier (kind of unwieldly)
@@ -99,17 +96,17 @@ for g = 1:length(bin_groups) % loop through different AP groups
             for m = 1:length(trace_ind)
                 temp = trace_struct_final(trace_ind(m));
                 tt = temp.time_interp;
-                ft = temp.fluo;
+                ft = temp.fluo_interp;
                 temp.time_interp = tt(tt>=t_start & tt < t_stop);
-                temp.fluo = ft(tt>=t_start & tt < t_stop);
-                if sum(temp.fluo>0) > 1 % exclude strings of pure zeros
+                temp.fluo_interp = ft(tt>=t_start & tt < t_stop);
+                if sum(temp.fluo_interp>0) > 1 % exclude strings of pure zeros
                     inference_set = [inference_set temp];
                 end
             end
-            skip_flag = 0;
-            set_size = length([inference_set.fluo]);                 
+            skip_flag = 0;            
             if isempty(inference_set)
                 skip_flag = 1;
+                set_size = length([inference_set.fluo_interp]);                 
             elseif set_size < min_dp_per_inf                    
                 skip_flag = 1;                    
             end
@@ -132,7 +129,7 @@ for g = 1:length(bin_groups) % loop through different AP groups
                 fluo_data = cell([length(sample_ids), 1]); % traces used for inference
                 sample_particles = [inference_set(sample_ids).ParticleID];
                 for tr = 1:length(sample_ids)
-                    fluo_data{tr} = inference_set(sample_ids(tr)).fluo;                                        
+                    fluo_data{tr} = inference_set(sample_ids(tr)).fluo_interp;                                        
                 end 
                 
                 % random initialization of parameters for iid inference
@@ -192,7 +189,7 @@ for g = 1:length(bin_groups) % loop through different AP groups
                 output.group_vec = min(bin_list):max(bin_list); % inf group info
                 output.t_window = t_window;
                 output.t_inf = t_inf;
-                output.fluo_type = fluo_field;
+                output.fluo_interp_type = fluo_field;
                 output.dp_bootstrap_flag = dp_bootstrap;
                 output.set_bootstrap_flag = set_bootstrap;
                 output.iter_id = b;                                                 

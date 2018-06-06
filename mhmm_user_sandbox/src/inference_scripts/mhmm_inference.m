@@ -13,19 +13,20 @@
     % 4) alpha_frac: fractional length of MS2 loops relative to full
     %    transcript. For instance, if MS2 length is 1302 and transcript
     %    length is 6444, alpha_frac = 1302/6444
+    % 5) ParticleID: unique trace (particle) identifier
     
 %%%---------------------------------------------------------------------%%%
 close all
 clear 
 addpath('../utilities'); % Route to utilities folder
 %-------------------------------System Vars-------------------------------%
-bin_groups = {-7:-4,-3:-2,-1:1,2:3,4:7}; % cell array containing region grouping for inference
-w = 7; % Memory
+bin_groups = {-1,1}; % cell array containing region grouping for inference
+w = 6; % Memory
 Tres = 20; % Time Resolution
-K = 3; % State to use for inference
+K = 2; % State to use for inference
 inference_times = (7.5:2.5:40)*60;%
 t_window = 15*60; % determines width of sliding window
-project = 'mHMMeve2_weka_inf_2018_05_07';  %identifier pointing to desired data set
+project = 'example_trace_set';  %identifier pointing to desired data set
 %------------------Define Inference Variables------------------------------%
 n_localEM = 25; % set num local runs (default=25)
 n_steps_max = 500; % set max steps per inference (default=500)
@@ -37,7 +38,7 @@ sample_size = 8000; % N data points to use
 min_dp_per_inf = 1250; % inference will be aborted if fewer present                                         
 %-------------------Load Data and Set Write Paths-------------------------%
 datapath = ['../../dat/' project '/']; %Path to inference data
-dataname = ['inference_traces_' project '_dT' num2str(Tres) '.mat']; %name of inference set
+dataname = 'trace_struct_final.mat'; %name of inference set
 % Load data for inference into struct named: trace_struct_final
 load([datapath dataname]);
 alpha = trace_struct_final(1).alpha_frac*w; % Rise Time for MS2 Loops in time steps
@@ -75,8 +76,7 @@ for g = 1:length(bin_groups) % loop through different AP groups
         for b = 1:n_bootstrap % iterate through bootstrap replicates
             iter_start = now;
             % structures of store inference info
-            local_struct = struct; % track results of each local run
-            init_struct = struct; % track param initiation values used
+            local_struct = struct; % track results of each local run            
             output = struct; % final output structure saved to file
             
             % Use current time as unique inference identifier (kind of unwieldly)
@@ -97,15 +97,17 @@ for g = 1:length(bin_groups) % loop through different AP groups
             for m = 1:length(trace_ind)
                 temp = trace_struct_final(trace_ind(m));
                 tt = temp.time_interp;
-                ft = temp.fluo;
+                ft = temp.fluo_interp;
                 temp.time_interp = tt(tt>=t_start & tt < t_stop);
-                temp.fluo = ft(tt>=t_start & tt < t_stop);
-                if sum(temp.fluo>0) > 1 % exclude strings of pure zeros
+                temp.fluo_interp = ft(tt>=t_start & tt < t_stop);
+                if sum(temp.fluo_interp>0) > 1 % exclude strings of pure zeros
                     inference_set = [inference_set temp];
                 end
             end
             skip_flag = 0;
-            set_size = length([inference_set.fluo]);                 
+            if ~isempty(inference_set)
+                set_size = length([inference_set.fluo_interp]);                 
+            end
             if isempty(inference_set)
                 skip_flag = 1;
             elseif set_size < min_dp_per_inf                    
@@ -130,7 +132,7 @@ for g = 1:length(bin_groups) % loop through different AP groups
                 fluo_data = cell([length(sample_ids), 1]); % traces used for inference
                 sample_particles = [inference_set(sample_ids).ParticleID];
                 for tr = 1:length(sample_ids)
-                    fluo_data{tr} = inference_set(sample_ids(tr)).fluo;                                        
+                    fluo_data{tr} = inference_set(sample_ids(tr)).fluo_interp;                                        
                 end 
                 
                 % random initialization of parameters for iid inference
@@ -174,12 +176,12 @@ for g = 1:length(bin_groups) % loop through different AP groups
                     local_struct(i_local).pi0 = exp(local_out.pi0_log);
                     local_struct(i_local).total_steps = local_out.n_iter;               
                     local_struct(i_local).soft_struct = local_out.soft_struct;               
-                end                                
+                end 
+                
                 [logL, max_index] = max([local_struct.logL]); % Get index of best result                    
                 % Save parameters from most likely local run
                 output.pi0 =local_struct(max_index).pi0;                        
-                output.r = local_struct(max_index).r(:);
-                output.off_traces = off_traces_flag;
+                output.r = local_struct(max_index).r(:);                
                 output.noise = local_struct(max_index).noise;
                 output.A = local_struct(max_index).A(:);
                 output.A_mat = local_struct(max_index).A;                            
@@ -189,16 +191,13 @@ for g = 1:length(bin_groups) % loop through different AP groups
                 % other inference characteristics
                 output.group_vec = min(bin_list):max(bin_list); % inf group info
                 output.t_window = t_window;
-                output.t_inf = t_inf;
-                output.fluo_type = fluo_field;
-                output.dp_bootstrap_flag = dp_bootstrap;
-                output.set_bootstrap_flag = set_bootstrap;
+                output.t_inf = t_inf;                                                
                 output.iter_id = b;                                                 
                 output.particle_ids = sample_particles;
                 output.N = ndp;                
                 output.w = w;
                 output.alpha = alpha;
-                output.deltaT = Tres;                 
+                output.Tres = Tres;                 
             end
             output.skip_flag = skip_flag;
             save([out_file '.mat'], 'output');           
