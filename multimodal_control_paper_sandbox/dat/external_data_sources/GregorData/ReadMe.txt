@@ -1,0 +1,1 @@
+Time-resolved Gap Gene concentrations obtained from: https://datadryad.org/resource/doi:10.5061/dryad.35h8v
