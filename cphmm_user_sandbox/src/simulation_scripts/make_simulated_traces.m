@@ -1,3 +1,12 @@
+% This script uses the Gillespie Algorithm to generate a set of simulated
+% MS2 traces that can be to test the cpHMM inference pipeline
+% Author: Nick Lammers
+
+% clear workspace
+clear
+close all
+
+% add path to utilities folder (contains useful functions)
 addpath('../utilities/');
 
 project = 'example_trace_set';
@@ -11,10 +20,11 @@ t_MS2 = 30; % time it takes to transcribe the MS2 loop [sec]
 alpha = t_MS2./ Tres ; % alpha: length of the MS2 loop in time steps
 
 % group-specific parameters
-inference_groups = [-1 1];
+inference_groups = [1 2];
 inference_labels = {'test1', 'test2'};
-% transition rates
-R_vec = {[-0.0150,  0.060; 0.0150, -0.060],.5*[-0.0150,  0.060; 0.0150, -0.060]};
+
+% define group-specific parameteres
+R_vec = {[-0.0150,  0.060; 0.0150, -0.060],.5*[-0.0150,  0.060; 0.0150, -0.060]}; % transition rates
 pi0_vec = {[0.3, 0.7],[0.3, 0.7]}; % initial state pmf
 noise_vec = [100, 150]; % background noise [a.u.]
 r_emission_vec = {[0, 60, 130],[0, 60, 130]*1.5}; % emission rate [a.u. / sec]
@@ -53,14 +63,15 @@ for i = 1:length(inference_groups)
         fluo_gill = synthetic_rate_gillespie(seq_length, alpha, ...
             K, w, R_vec{i}, Tres, r_emission_vec{i}, noise_vec(i), pi0_vec{i});
 
-        trace_struct_final(i_pass).fluo_interp = fluo_gill.fluo_MS2;
-        trace_struct_final(i_pass).time_interp = Tres:Tres:Tres*seq_length;
+        trace_struct_final(i_pass).Tres = Tres;
+        trace_struct_final(i_pass).fluo_interp = fluo_gill.fluo_MS2; % simulated fluorescence
+        trace_struct_final(i_pass).time_interp = Tres:Tres:Tres*seq_length; % simulation time
         trace_struct_final(i_pass).promoter_trajectory = fluo_gill.naive_states;
-        trace_struct_final(i_pass).promoter_transition_times = fluo_gill.transition_times;    
-        trace_struct_final(i_pass).alpha_frac = synthetic_parameters.alpha_frac;
-        trace_struct_final(i_pass).group_vec_interp = repelem(i_group,seq_length); % note that group membership can in principle vary over time
-        trace_struct_final(i_pass).group_label = i_label;
-        trace_struct_final(i_pass).ParticleID = i_pass;
+        trace_struct_final(i_pass).promoter_transition_times = fluo_gill.transition_times;     
+        trace_struct_final(i_pass).alpha_frac = synthetic_parameters.alpha_frac; % length of MS2 loops (as fraction of total gene length)
+        trace_struct_final(i_pass).group_id = i_group; 
+        trace_struct_final(i_pass).group_label = i_label; % group membership
+        trace_struct_final(i_pass).ParticleID = i_pass; % unique particle identifier
         i_pass = i_pass + 1;
     end  
 end
