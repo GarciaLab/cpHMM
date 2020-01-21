@@ -168,9 +168,7 @@ for g = 1:length(bin_groups) % loop through different AP groups
             output.total_steps = local_struct(max_index).total_steps;                                  
             output.total_time = 100000*(now - iter_start);                                                         
             % other inference characteristics
-            output.group_vec = min(bin_id):max(bin_id); % inf group info
-            output.t_window = t_window;
-            output.t_inf = t_inf;                                                
+            output.group_id = bin_id; % inf group info                                                      
             output.iter_id = b;                                                 
             output.particle_ids = sample_particles;
             output.N = ndp;                
